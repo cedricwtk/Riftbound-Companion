@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Riftbound",
+    "slug": "riftbound",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0F"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0F"
+      },
+      "package": "com.riftbound.companion"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.riftbound.companion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c8b57833-7a2f-41e0-8eb2-16fdad6b922e"
+      }
+    }
+  }
+}
