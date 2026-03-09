@@ -6,16 +6,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '../utils/theme';
-import { fetchCards, DOMAIN_COLORS } from '../utils/api';
+import { fetchCards, DOMAIN_COLORS, RARITIES } from '../utils/api';
 
-const CARD_TYPES = ['', 'Unit', 'Spell', 'Battlefield', 'Gear', 'Legend', 'Champion'];
-const DOMAINS = ['', 'Fury', 'Body', 'Calm', 'Mind', 'Order', 'Chaos', 'Colorless'];
+const ALL_CARD_TYPES = ['', 'Unit', 'Spell', 'Battlefield', 'Gear', 'Rune', 'Legend', 'Champion'];
+const ALL_DOMAINS    = ['', 'Fury', 'Body', 'Calm', 'Mind', 'Order', 'Chaos', 'Colorless'];
 
 // ── Card Tile ────────────────────────────────────────────────────────────────
-const CardTile = ({ card, onPress }) => {
+// deckCounts: { [cardId]: number } — current count in deck
+// maxCount:   per-card cap (default 3, battlefields use 1)
+// onAdd / onRemove: increment/decrement callbacks
+const CardTile = ({ card, onPress, dimmed, deckCounts, maxCount = 3, onAdd, onRemove }) => {
   const domainColor = DOMAIN_COLORS[card.domain] || COLORS.textSecondary;
+  const rarityColor = RARITIES.find(r => r.value === card.rarity)?.color || COLORS.textMuted;
+  const count       = deckCounts ? (deckCounts[card.name] || 0) : 0;
+  const atMax       = count >= maxCount;
+  const inDeck      = count > 0;
+  const counterMode = !!deckCounts;
+
   return (
-    <TouchableOpacity style={styles.cardTile} onPress={() => onPress(card)} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={[styles.cardTile, dimmed && styles.cardTileDimmed, inDeck && styles.cardTileInDeck]}
+      onPress={() => onPress(card)}
+      activeOpacity={0.85}
+    >
       {card.art?.thumbnailUrl ? (
         <Image source={{ uri: card.art.thumbnailUrl }} style={styles.cardThumb} resizeMode="cover" />
       ) : (
@@ -23,6 +36,13 @@ const CardTile = ({ card, onPress }) => {
           <Ionicons name="image-outline" size={24} color={COLORS.textMuted} />
         </View>
       )}
+      {/* In-deck count badge on thumbnail */}
+      {inDeck && (
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{count}</Text>
+        </View>
+      )}
+
       <View style={styles.cardInfo}>
         <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
         <View style={styles.cardMeta}>
@@ -52,16 +72,45 @@ const CardTile = ({ card, onPress }) => {
             )}
           </View>
         )}
-        <Text style={styles.cardRarity}>{card.rarity}</Text>
+        <Text style={[styles.cardRarity, { color: rarityColor }]}>{card.rarity}</Text>
       </View>
+
+      {/* Inline counter — only when in counter mode */}
+      {counterMode && (
+        <View style={styles.tileCounter}>
+          <TouchableOpacity
+            style={[styles.tileCountBtn, !inDeck && styles.tileCountBtnDisabled]}
+            onPress={(e) => { e.stopPropagation?.(); onRemove?.(card); }}
+            disabled={!inDeck}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="remove" size={16} color={inDeck ? COLORS.textPrimary : COLORS.textMuted} />
+          </TouchableOpacity>
+          <Text style={[styles.tileCountNum, atMax && { color: COLORS.win }]}>{count}</Text>
+          <TouchableOpacity
+            style={[styles.tileCountBtn, atMax && styles.tileCountBtnDisabled]}
+            onPress={(e) => { e.stopPropagation?.(); onAdd?.(card); }}
+            disabled={atMax}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="add" size={16} color={atMax ? COLORS.textMuted : COLORS.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
 
 // ── Card Detail Modal ────────────────────────────────────────────────────────
-const CardDetailModal = ({ card, visible, onClose, onAddToDeck }) => {
+const CardDetailModal = ({ card, visible, onClose, onAddToDeck, addToDeckLabel, isAllowed }) => {
   if (!card) return null;
+
+  const handleAdd = () => {
+    onAddToDeck(card);
+    onClose(); // auto-close after adding
+  };
   const domainColor = DOMAIN_COLORS[card.domain] || COLORS.textSecondary;
+  const rarityColor = RARITIES.find(r => r.value === card.rarity)?.color || COLORS.textMuted;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.detailOverlay}>
@@ -81,7 +130,7 @@ const CardDetailModal = ({ card, visible, onClose, onAddToDeck }) => {
             <View style={styles.detailMeta}>
               <Text style={[styles.detailDomain, { color: domainColor }]}>{card.domain}</Text>
               <Text style={styles.detailType}>{card.type}</Text>
-              <Text style={styles.detailRarity}>{card.rarity}</Text>
+              <Text style={[styles.detailRarity, { color: rarityColor }]}>{card.rarity}</Text>
             </View>
             {card.stats && (
               <View style={styles.detailStats}>
@@ -101,10 +150,17 @@ const CardDetailModal = ({ card, visible, onClose, onAddToDeck }) => {
             )}
           </ScrollView>
           {onAddToDeck && (
-            <TouchableOpacity style={styles.addToDeckBtn} onPress={() => onAddToDeck(card)}>
-              <Ionicons name="add-circle-outline" size={18} color={COLORS.textPrimary} />
-              <Text style={styles.addToDeckBtnText}>Add to Deck</Text>
-            </TouchableOpacity>
+            isAllowed === false ? (
+              <View style={styles.notAllowedBanner}>
+                <Ionicons name="ban-outline" size={16} color={COLORS.danger} />
+                <Text style={styles.notAllowedText}>Not in your deck's allowed domains</Text>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.addToDeckBtn} onPress={handleAdd}>
+                <Ionicons name="add-circle-outline" size={18} color={COLORS.textPrimary} />
+                <Text style={styles.addToDeckBtnText}>{addToDeckLabel || 'Add to Deck'}</Text>
+              </TouchableOpacity>
+            )
           )}
         </View>
       </View>
@@ -113,16 +169,44 @@ const CardDetailModal = ({ card, visible, onClose, onAddToDeck }) => {
 };
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
-export default function CardsScreen({ onAddToDeck }) {
-  const [cards, setCards] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState('');
+// Props:
+//   onAddToDeck      callback when user taps Add button
+//   addToDeckLabel   button label override
+//   forcedType       lock cards to a single type (e.g. 'Battlefield', 'Rune')
+//   forcedDomains    array of allowed domains — cards outside are dimmed/blocked
+//   hideLegend       hide Legend cards from results
+//   hideBattlefield  hide Battlefield cards from results
+export default function CardsScreen({
+  onAddToDeck,
+  addToDeckLabel,
+  forcedType,
+  forcedDomains,
+  hideLegend,
+  hideBattlefield,
+  excludeRarity,     // exclude cards with this rarity (e.g. 'Showcase')
+  deckCounts,        // { [cardId]: count } — for inline counter mode
+  onRemoveFromDeck,  // callback to decrement a card
+  maxCount = 3,      // per-card cap (battlefields: 1)
+}) {
+  const [cards, setCards]               = useState([]);
+  const [loading, setLoading]           = useState(false);
+  const [page, setPage]                 = useState(1);
+  const [total, setTotal]               = useState(0);
+  const [search, setSearch]             = useState('');
   const [filterDomain, setFilterDomain] = useState('');
-  const [filterType, setFilterType] = useState('');
+  const [filterType, setFilterType]     = useState(forcedType || '');
+  const [filterRarity, setFilterRarity] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters]   = useState(false);
+
+  // Restrict domain chips when forcedDomains set
+  const availableDomains = forcedDomains ? ['', ...forcedDomains] : ALL_DOMAINS;
+  const availableTypes   = forcedType    ? [forcedType]           : ALL_CARD_TYPES;
+
+  const isCardAllowed = useCallback((card) => {
+    if (!forcedDomains || forcedDomains.length === 0) return true;
+    return forcedDomains.includes(card.domain);
+  }, [forcedDomains]);
 
   const loadCards = useCallback(async (reset = false) => {
     if (loading) return;
@@ -133,29 +217,48 @@ export default function CardsScreen({ onAddToDeck }) {
       pageSize: 20,
       search,
       faction: filterDomain,
-      type: filterType,
+      type: filterType || forcedType || '',
+      rarity: filterRarity,
     });
-    setCards(prev => reset ? result.cards : [...prev, ...result.cards]);
+
+    let filtered = result.cards;
+    // Client-side domain filtering when multiple domains enforced
+    if (forcedDomains && forcedDomains.length > 0 && !filterDomain) {
+      filtered = filtered.filter(c => forcedDomains.includes(c.domain));
+    }
+    if (hideLegend)      filtered = filtered.filter(c => c.type !== 'Legend');
+    if (hideBattlefield) filtered = filtered.filter(c => c.type !== 'Battlefield');
+    if (excludeRarity)   filtered = filtered.filter(c => c.rarity !== excludeRarity);
+
+    setCards(prev => {
+      const merged = reset ? filtered : [...prev, ...filtered];
+      // Deduplicate by id — pagination can return overlapping results
+      const seen = new Set();
+      return merged.filter(c => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      });
+    });
     setTotal(result.total);
     if (!reset) setPage(p => p + 1);
     else setPage(2);
     setLoading(false);
-  }, [search, filterDomain, filterType, page, loading]);
+  }, [search, filterDomain, filterType, filterRarity, page, loading,
+      forcedType, forcedDomains, hideLegend, hideBattlefield, excludeRarity]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadCards(true), 400);
     return () => clearTimeout(timer);
-  }, [search, filterDomain, filterType]);
+  }, [search, filterDomain, filterType, filterRarity]);
 
-  const loadMore = () => {
-    if (cards.length < total) loadCards(false);
-  };
+  const loadMore = () => { if (cards.length < total) loadCards(false); };
 
-  const hasFilters = filterDomain || filterType;
+  const hasFilters = filterDomain || (filterType && filterType !== forcedType) || filterRarity;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      {/* Search bar */}
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      {/* Search row */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={16} color={COLORS.textMuted} />
@@ -172,20 +275,23 @@ export default function CardsScreen({ onAddToDeck }) {
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity
-          style={[styles.filterBtn, hasFilters && styles.filterBtnActive]}
-          onPress={() => setShowFilters(v => !v)}
-        >
-          <Ionicons name="options-outline" size={18} color={hasFilters ? COLORS.goldLight : COLORS.textSecondary} />
-        </TouchableOpacity>
+        {/* Hide filter toggle when type is fully locked */}
+        {!forcedType && (
+          <TouchableOpacity
+            style={[styles.filterBtn, hasFilters && styles.filterBtnActive]}
+            onPress={() => setShowFilters(v => !v)}
+          >
+            <Ionicons name="options-outline" size={18} color={hasFilters ? COLORS.goldLight : COLORS.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter chips */}
-      {showFilters && (
+      {/* Filter panel */}
+      {showFilters && !forcedType && (
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>DOMAIN</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
-            {DOMAINS.map(d => (
+            {availableDomains.map(d => (
               <TouchableOpacity
                 key={d}
                 style={[styles.chip, filterDomain === d && styles.chipActive]}
@@ -198,9 +304,10 @@ export default function CardsScreen({ onAddToDeck }) {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
           <Text style={styles.filterLabel}>TYPE</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
-            {CARD_TYPES.map(t => (
+            {availableTypes.map(t => (
               <TouchableOpacity
                 key={t}
                 style={[styles.chip, filterType === t && styles.chipActive]}
@@ -212,18 +319,50 @@ export default function CardsScreen({ onAddToDeck }) {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          <Text style={styles.filterLabel}>RARITY</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
+            {RARITIES.map(r => (
+              <TouchableOpacity
+                key={r.value}
+                style={[
+                  styles.chip,
+                  filterRarity === r.value && styles.chipActive,
+                  filterRarity === r.value && { borderColor: r.color },
+                ]}
+                onPress={() => setFilterRarity(r.value)}
+              >
+                <View style={[styles.chipDot, { backgroundColor: r.color }]} />
+                <Text style={[
+                  styles.chipText,
+                  filterRarity === r.value && styles.chipTextActive,
+                  filterRarity === r.value && { color: r.color },
+                ]}>
+                  {r.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
       <Text style={styles.resultsCount}>
-        {total > 0 ? `${total} cards` : loading ? 'Loading...' : 'No cards found'}
+        {cards.length > 0 ? `${cards.length} cards` : loading ? 'Loading...' : 'No cards found'}
       </Text>
 
       <FlatList
         data={cards}
-        keyExtractor={item => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
-          <CardTile card={item} onPress={setSelectedCard} />
+          <CardTile
+            card={item}
+            onPress={setSelectedCard}
+            dimmed={!isCardAllowed(item)}
+            deckCounts={deckCounts}
+            maxCount={maxCount}
+            onAdd={onAddToDeck ? () => onAddToDeck(item) : undefined}
+            onRemove={onRemoveFromDeck ? () => onRemoveFromDeck(item) : undefined}
+          />
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
@@ -233,9 +372,7 @@ export default function CardsScreen({ onAddToDeck }) {
             <View style={styles.emptyState}>
               <Ionicons name="card-outline" size={48} color={COLORS.textMuted} />
               <Text style={styles.emptyTitle}>No Cards Found</Text>
-              <Text style={styles.emptySubtitle}>
-                Make sure your Scrydex API key is set in src/utils/api.js
-              </Text>
+              <Text style={styles.emptySubtitle}>Try adjusting your search or filters</Text>
             </View>
           ) : null
         }
@@ -247,6 +384,8 @@ export default function CardsScreen({ onAddToDeck }) {
         visible={!!selectedCard}
         onClose={() => setSelectedCard(null)}
         onAddToDeck={onAddToDeck}
+        addToDeckLabel={addToDeckLabel}
+        isAllowed={selectedCard ? isCardAllowed(selectedCard) : true}
       />
     </SafeAreaView>
   );
@@ -270,7 +409,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.border,
   },
   filterBtnActive: { borderColor: COLORS.gold, backgroundColor: COLORS.bgElevated },
-
   filterSection: { padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   filterLabel: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 2, marginBottom: SPACING.xs },
   chipsRow: { marginBottom: SPACING.sm },
@@ -284,16 +422,15 @@ const styles = StyleSheet.create({
   chipDot: { width: 8, height: 8, borderRadius: 4 },
   chipText: { fontSize: 12, color: COLORS.textSecondary },
   chipTextActive: { color: COLORS.textPrimary, fontWeight: '600' },
-
   resultsCount: { fontSize: 11, color: COLORS.textMuted, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, letterSpacing: 1 },
-
   list: { padding: SPACING.md, gap: SPACING.sm, paddingBottom: 80 },
-
   cardTile: {
     flexDirection: 'row', backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.md, overflow: 'hidden',
     borderWidth: 1, borderColor: COLORS.border,
   },
+  cardTileInDeck: { borderColor: COLORS.arcane + '90' },
+  cardTileDimmed: { opacity: 0.3 },
   cardThumb: { width: 90, height: 126 },
   cardThumbPlaceholder: { backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center' },
   cardInfo: { flex: 1, padding: SPACING.sm, justifyContent: 'space-between' },
@@ -309,12 +446,36 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 8, color: COLORS.textMuted, letterSpacing: 0.5 },
   statVal: { fontSize: 12, color: COLORS.textPrimary, fontWeight: '700' },
-  cardRarity: { fontSize: 10, color: COLORS.goldDark, letterSpacing: 1 },
+  cardRarity: { fontSize: 10, letterSpacing: 1 },
 
+  // In-deck count badge on thumbnail
+  countBadge: {
+    position: 'absolute', top: 6, left: 6,
+    backgroundColor: COLORS.arcane, borderRadius: RADIUS.full,
+    minWidth: 22, height: 22, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 4, borderWidth: 1, borderColor: COLORS.arcaneBright,
+  },
+  countBadgeText: { color: COLORS.textPrimary, fontSize: 11, fontWeight: '800' },
+
+  // Inline tile counter (right side)
+  tileCounter: {
+    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.sm,
+    borderLeftWidth: 1, borderLeftColor: COLORS.border,
+  },
+  tileCountBtn: {
+    width: 30, height: 30, borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  tileCountBtnDisabled: { opacity: 0.25 },
+  tileCountNum: {
+    fontSize: 16, fontWeight: '800', color: COLORS.textPrimary,
+    minWidth: 20, textAlign: 'center',
+  },
   emptyState: { alignItems: 'center', padding: SPACING.xxl },
   emptyTitle: { fontSize: 18, color: COLORS.textSecondary, marginTop: SPACING.md, fontWeight: '600' },
   emptySubtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: SPACING.sm, textAlign: 'center' },
-
   // Detail Modal
   detailOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'flex-end' },
   detailModal: {
@@ -328,7 +489,7 @@ const styles = StyleSheet.create({
   detailMeta: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md, flexWrap: 'wrap' },
   detailDomain: { fontSize: 13, fontWeight: '600' },
   detailType: { fontSize: 13, color: COLORS.textSecondary },
-  detailRarity: { fontSize: 13, color: COLORS.goldDark },
+  detailRarity: { fontSize: 13 },
   detailStats: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
   detailStatChip: {
     backgroundColor: COLORS.bgElevated, borderRadius: RADIUS.sm,
@@ -341,8 +502,13 @@ const styles = StyleSheet.create({
   detailFlavor: { fontSize: 13, color: COLORS.textMuted, fontStyle: 'italic', marginTop: SPACING.sm, lineHeight: 20 },
   addToDeckBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
-    backgroundColor: COLORS.arcane, padding: SPACING.md, margin: SPACING.md,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.arcane, padding: SPACING.md, margin: SPACING.md, borderRadius: RADIUS.md,
   },
   addToDeckBtnText: { color: COLORS.textPrimary, fontWeight: '700', fontSize: 15 },
+  notAllowedBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
+    backgroundColor: COLORS.bgElevated, padding: SPACING.md, margin: SPACING.md,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.danger + '50',
+  },
+  notAllowedText: { color: COLORS.danger, fontSize: 13, fontWeight: '600' },
 });

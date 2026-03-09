@@ -1,15 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEYS = {
-  DECKS: 'riftbound_decks',
-  GAME_HISTORY: 'riftbound_game_history',
-  SETTINGS: 'riftbound_settings',
-};
+const DECKS_KEY    = 'riftbound_decks_v1';
+const SETTINGS_KEY = 'riftbound_settings';
 
-// --- Decks ---
+// ── Decks ─────────────────────────────────────────────────────────────────────
 export const getDecks = async () => {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.DECKS);
+    const raw = await AsyncStorage.getItem(DECKS_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 };
@@ -19,8 +16,8 @@ export const saveDeck = async (deck) => {
     const decks = await getDecks();
     const idx = decks.findIndex(d => d.id === deck.id);
     if (idx >= 0) decks[idx] = deck;
-    else decks.push(deck);
-    await AsyncStorage.setItem(KEYS.DECKS, JSON.stringify(decks));
+    else decks.unshift(deck);
+    await AsyncStorage.setItem(DECKS_KEY, JSON.stringify(decks));
     return true;
   } catch { return false; }
 };
@@ -29,40 +26,40 @@ export const deleteDeck = async (deckId) => {
   try {
     const decks = await getDecks();
     const filtered = decks.filter(d => d.id !== deckId);
-    await AsyncStorage.setItem(KEYS.DECKS, JSON.stringify(filtered));
+    await AsyncStorage.setItem(DECKS_KEY, JSON.stringify(filtered));
     return true;
   } catch { return false; }
 };
 
-// --- Game History ---
-export const getGameHistory = async () => {
+// ── Premium ───────────────────────────────────────────────────────────────────
+const PREMIUM_KEY = 'riftbound_premium';
+
+export const isPremium = async () => {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.GAME_HISTORY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    const val = await AsyncStorage.getItem(PREMIUM_KEY);
+    return val === 'true';
+  } catch { return false; }
 };
 
-export const saveGame = async (game) => {
+export const setPremium = async (value) => {
   try {
-    const history = await getGameHistory();
-    history.unshift(game); // newest first
-    const trimmed = history.slice(0, 50); // keep last 50
-    await AsyncStorage.setItem(KEYS.GAME_HISTORY, JSON.stringify(trimmed));
+    await AsyncStorage.setItem(PREMIUM_KEY, value ? 'true' : 'false');
     return true;
   } catch { return false; }
 };
 
-// --- Settings ---
+// ── Settings ──────────────────────────────────────────────────────────────────
+// Shape: { eTransferEmail: string, displayName: string, includeETransfer: boolean }
 export const getSettings = async () => {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
-    return raw ? JSON.parse(raw) : { defaultWinPoints: 8 };
-  } catch { return { defaultWinPoints: 8 }; }
+    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
 };
 
 export const saveSettings = async (settings) => {
   try {
-    await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     return true;
   } catch { return false; }
 };
