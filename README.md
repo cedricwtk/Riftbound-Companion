@@ -16,12 +16,7 @@ A React Native (Expo) app for tracking scores and building decks for the Riftbou
 npm install
 ```
 
-### 2. Set up Scrydex API Key
-1. Go to https://scrydex.com and sign up for a free account
-2. Get your API key and Team ID
-3. Open `src/utils/api.js` and replace:
-   - `YOUR_SCRYDEX_API_KEY` with your API key
-   - `YOUR_TEAM_ID` with your team ID
+### 2. Set up RiftCodex
 
 ### 3. Run the app
 ```bash
