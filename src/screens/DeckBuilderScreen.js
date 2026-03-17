@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS } from '../utils/theme';
 import { getDecks, saveDeck, deleteDeck, isPremium } from '../utils/storage';
 import PremiumGate from '../components/PremiumGate';
+import DeckStatsModal from '../components/DeckStatsModal';
 import CardsScreen from './CardsScreen';
 import { DOMAIN_COLORS, RARITIES, fetchCards } from '../utils/api';
 
@@ -22,6 +23,9 @@ const MAX_POOL        = 48;   // max total cards across main + sideboard
 const MAX_RUNES       = 12;
 const MAX_BATTLEFIELDS = 3;
 const MAX_COPIES      = 3;    // across the whole pool (main + sideboard combined)
+
+// A card is "Unique" if its rules text contains [Unique]
+const isUnique = (card) => card.rules?.some(r => r.includes('[Unique]'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Slot accessors
@@ -219,6 +223,7 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
   const [newName, setNewName]           = useState('');
   const [premiumUser, setPremiumUser]   = useState(false);
   const [showGate, setShowGate]         = useState(false);
+  const [showStats, setShowStats]       = useState(false);
 
   const FREE_DECK_LIMIT = 3;
   // browseMode: null | 'legend' | 'champion' | 'battlefield' | 'main' | 'sideboard'
@@ -313,8 +318,17 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
     }
 
     if (browseMode === 'champion') {
+      if (card.type !== 'Unit') {
+        Alert.alert('Wrong Type', 'Only Unit cards can be set as champion.');
+        return;
+      }
       if (!domainOk()) {
         Alert.alert('Wrong Domain', `"${card.name}" doesn't belong to your legend's domains (${legendDomains.join(', ')}).`);
+        return;
+      }
+      const legendTags = getLegend(activeDeck)?.tags || [];
+      if (legendTags.length > 0 && !card.tags?.some(t => legendTags.includes(t))) {
+        Alert.alert('Wrong Champion', `"${card.name}" doesn't match your legend's champion.`);
         return;
       }
       persist(d => ({ ...d, slots: { ...d.slots, champion: card } }));
@@ -373,6 +387,14 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
         Alert.alert('Wrong Domain', `"${card.name}" doesn't belong to your legend's domains (${legendDomains.join(', ')}).`);
         return;
       }
+      const lt = getLegend(activeDeck)?.tags || [];
+      if (lt.length > 0 && card.tags?.length > 0
+          && card.type !== 'Unit' && card.type !== 'Champion'
+          && !card.tags.some(t => lt.includes(t))
+          && !(card.type === 'Gear' && !card.tags.some(t => t !== 'Equipment'))) {
+        Alert.alert('Wrong Champion', `"${card.name}" belongs to a different champion.`);
+        return;
+      }
       persist(d => {
         const main      = [...getMain(d)];
         const side      = getSideboard(d);
@@ -382,7 +404,8 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
         // Count ALL copies of this name across main + sideboard
         const mainNameCount = idx >= 0 ? main[idx].count : 0;
         const sideNameCount = side.filter(c => c.name === card.name).reduce((s, c) => s + c.count, 0);
-        if (mainNameCount + sideNameCount >= MAX_COPIES) { Alert.alert('Max Copies', `Max ${MAX_COPIES} copies of "${card.name}" across main deck + sideboard.`); return d; }
+        const copyLimit = isUnique(card) ? 1 : MAX_COPIES;
+        if (mainNameCount + sideNameCount >= copyLimit) { Alert.alert(isUnique(card) ? 'Unique Card' : 'Max Copies', isUnique(card) ? `"${card.name}" is Unique — only 1 copy allowed in your deck.` : `Max ${MAX_COPIES} copies of "${card.name}" across main deck + sideboard.`); return d; }
         if (mainTotal >= MAX_MAIN) { Alert.alert('Deck Full', `Max ${MAX_MAIN} cards in main deck.`); return d; }
         if (idx >= 0) {
           main[idx] = { ...main[idx], count: main[idx].count + 1 };
@@ -404,6 +427,14 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
         Alert.alert('Wrong Domain', `"${card.name}" doesn't belong to your legend's domains (${legendDomains.join(', ')}).`);
         return;
       }
+      const lt = getLegend(activeDeck)?.tags || [];
+      if (lt.length > 0 && card.tags?.length > 0
+          && card.type !== 'Unit' && card.type !== 'Champion'
+          && !card.tags.some(t => lt.includes(t))
+          && !(card.type === 'Gear' && !card.tags.some(t => t !== 'Equipment'))) {
+        Alert.alert('Wrong Champion', `"${card.name}" belongs to a different champion.`);
+        return;
+      }
       persist(d => {
         const side      = [...getSideboard(d)];
         const main      = getMain(d);
@@ -412,7 +443,8 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
         // Count ALL copies of this name across main + sideboard
         const sideNameCount = idx >= 0 ? side[idx].count : 0;
         const mainNameCount = main.filter(c => c.name === card.name).reduce((s, c) => s + c.count, 0);
-        if (sideNameCount + mainNameCount >= MAX_COPIES) { Alert.alert('Max Copies', `Max ${MAX_COPIES} copies of "${card.name}" across main deck + sideboard.`); return d; }
+        const copyLimit = isUnique(card) ? 1 : MAX_COPIES;
+        if (sideNameCount + mainNameCount >= copyLimit) { Alert.alert(isUnique(card) ? 'Unique Card' : 'Max Copies', isUnique(card) ? `"${card.name}" is Unique — only 1 copy allowed in your deck.` : `Max ${MAX_COPIES} copies of "${card.name}" across main deck + sideboard.`); return d; }
         if (sideTotal >= MAX_SIDEBOARD) { Alert.alert('Sideboard Full', `Max ${MAX_SIDEBOARD} cards in sideboard.`); return d; }
         if (idx >= 0) {
           side[idx] = { ...side[idx], count: side[idx].count + 1 };
@@ -462,9 +494,10 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
       const card       = getMain(d).find(c => c.id === id);
       if (!card) return d;
       const sideNameCount = getSideboard(d).filter(c => c.name === card.name).reduce((s,c)=>s+c.count,0);
+      const copyLimit = isUnique(card) ? 1 : MAX_COPIES;
       const main = d.slots.main.map(c => {
         if (c.id !== id) return c;
-        if (c.count + sideNameCount >= MAX_COPIES || mainTotal >= MAX_MAIN) return c;
+        if (c.count + sideNameCount >= copyLimit || mainTotal >= MAX_MAIN) return c;
         return { ...c, count: c.count + 1 };
       });
       return { ...d, slots: { ...d.slots, main } };
@@ -474,9 +507,10 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
       const card       = getSideboard(d).find(c => c.id === id);
       if (!card) return d;
       const mainNameCount = getMain(d).filter(c => c.name === card.name).reduce((s,c)=>s+c.count,0);
+      const copyLimit = isUnique(card) ? 1 : MAX_COPIES;
       const side = (d.slots.sideboard || []).map(c => {
         if (c.id !== id) return c;
-        if (c.count + mainNameCount >= MAX_COPIES || sideTotal >= MAX_SIDEBOARD) return c;
+        if (c.count + mainNameCount >= copyLimit || sideTotal >= MAX_SIDEBOARD) return c;
         return { ...c, count: c.count + 1 };
       });
       return { ...d, slots: { ...d.slots, sideboard: side } };
@@ -569,11 +603,16 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
     const csProps = {};
     if (browseMode === 'legend')    { csProps.forcedType = 'Legend'; csProps.maxCount = 1; }
     if (browseMode === 'battlefield') { csProps.forcedType = 'Battlefield'; csProps.maxCount = 1; }
-    if (browseMode === 'champion')    { csProps.forcedDomains = legendDomains; }
+    if (browseMode === 'champion') {
+      csProps.forcedDomains = legendDomains;
+      csProps.forcedType    = 'Unit';
+      csProps.forcedTags    = getLegend(activeDeck)?.tags || [];
+    }
     if (browseMode === 'main' || browseMode === 'sideboard') {
       csProps.forcedDomains   = legendDomains;
       csProps.hideLegend      = true;
       csProps.hideBattlefield = true;
+      csProps.legendTags      = getLegend(activeDeck)?.tags || [];
     }
 
     return (
@@ -726,6 +765,15 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
             </View>
           )}
         </View>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => {
+            if (!premiumUser) { setShowGate(true); return; }
+            setShowStats(true);
+          }}
+        >
+          <Ionicons name="bar-chart-outline" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.iconBtn} onPress={share}>
           <Ionicons name="share-outline" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
@@ -878,6 +926,12 @@ export default function DeckBuilderScreen({ onPremiumChange }) {
         }
 
       </ScrollView>
+
+      <DeckStatsModal
+        visible={showStats}
+        deck={activeDeck}
+        onClose={() => setShowStats(false)}
+      />
     </SafeAreaView>
   );
 }

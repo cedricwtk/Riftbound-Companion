@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image, Modal, ScrollView
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image, Modal, ScrollView, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS } from '../utils/theme';
-import { DOMAIN_COLORS } from '../utils/api';
+import { DOMAIN_COLORS, fetchCards } from '../utils/api';
 import { isPremium } from '../utils/storage';
 import PremiumGate from '../components/PremiumGate';
 
@@ -25,6 +25,16 @@ const clearHistory = async () => {
   await AsyncStorage.removeItem(HISTORY_KEY);
 };
 
+const saveMatch = async (updatedMatch) => {
+  try {
+    const all = await getHistory();
+    const idx = all.findIndex(m => m.id === updatedMatch.id);
+    if (idx >= 0) all[idx] = updatedMatch;
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(all));
+    return true;
+  } catch { return false; }
+};
+
 // ── Win/Loss colors ───────────────────────────────────────────────────────────
 const WIN_GRADIENT  = ['#0D2B1A', '#081A10'];
 const LOSS_GRADIENT = ['#2B0D0D', '#1A0808'];
@@ -33,8 +43,240 @@ const LOSS_BORDER   = '#6B2A2A';
 const WIN_ACCENT    = '#4CAF50';
 const LOSS_ACCENT   = '#E05252';
 
+// ── Legend Picker (for editing match history) ─────────────────────────────────
+const HistoryLegendPicker = ({ visible, onSelect, onClose, currentValue }) => {
+  const [legends, setLegends] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search,  setSearch]  = useState('');
+
+  useEffect(() => {
+    if (!visible || legends.length > 0) return;
+    setLoading(true);
+    fetchCards({ type: 'Legend' })
+      .then(({ cards }) => {
+        const sorted = (cards || []).sort((a, b) => {
+          const ta = (a.tags?.[0] || a.name).toLowerCase();
+          const tb = (b.tags?.[0] || b.name).toLowerCase();
+          return ta.localeCompare(tb);
+        });
+        setLegends(sorted);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [visible]);
+
+  const displayed = search.trim()
+    ? legends.filter(c => {
+        const q = search.trim().toLowerCase();
+        return (c.tags?.[0] || '').toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
+      })
+    : legends;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+        <View style={styles.editPickerHeader}>
+          <Text style={styles.editPickerTitle}>CHOOSE LEGEND</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.editPickerSearch}>
+          <Ionicons name="search" size={15} color={COLORS.textMuted} />
+          <TextInput
+            style={styles.editPickerSearchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search legends…"
+            placeholderTextColor={COLORS.textMuted}
+            autoCorrect={false}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={15} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <FlatList
+          data={displayed}
+          keyExtractor={item => item.id}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: SPACING.md }}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <TouchableOpacity
+              style={[styles.editLegendItem, !currentValue && styles.editLegendItemActive]}
+              onPress={() => { onSelect(null); onClose(); }}
+            >
+              <View style={[styles.editLegendThumb, { backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="close-circle-outline" size={20} color={COLORS.textMuted} />
+              </View>
+              <Text style={{ color: COLORS.textMuted, fontSize: 14, fontWeight: '600' }}>No legend</Text>
+            </TouchableOpacity>
+          }
+          ListEmptyComponent={
+            <Text style={{ color: COLORS.textMuted, textAlign: 'center', padding: SPACING.lg }}>
+              {loading ? 'Loading legends…' : `No results for "${search}"`}
+            </Text>
+          }
+          renderItem={({ item: card }) => {
+            const champion = card.tags?.[0] || card.name;
+            const domains  = card.domains || [];
+            const isActive = currentValue?.cardId === card.id;
+            return (
+              <TouchableOpacity
+                style={[styles.editLegendItem, isActive && styles.editLegendItemActive]}
+                onPress={() => {
+                  onSelect({ cardId: card.id, legendName: champion, cardTitle: card.name, domains, art: card.art?.thumbnailUrl || null });
+                  onClose();
+                }}
+              >
+                {card.art?.thumbnailUrl ? (
+                  <Image source={{ uri: card.art.thumbnailUrl }} style={styles.editLegendThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.editLegendThumb, { backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="shield-outline" size={18} color={COLORS.textMuted} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.textPrimary, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{champion}</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: 11 }} numberOfLines={1}>{card.name}</Text>
+                  {domains.length > 0 && (
+                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
+                      {domains.map(d => (
+                        <View key={d} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: DOMAIN_COLORS[d] || COLORS.textMuted }} />
+                      ))}
+                    </View>
+                  )}
+                </View>
+                {isActive && <Ionicons name="checkmark" size={16} color={COLORS.win} />}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </SafeAreaView>
+    </Modal>
+  );
+};
+
+// ── Battlefield Picker (for editing match history) ────────────────────────────
+const HistoryBFPicker = ({ visible, onSelect, onClose, currentValue }) => {
+  const [bfs, setBfs]         = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch]   = useState('');
+
+  useEffect(() => {
+    if (!visible || bfs.length > 0) return;
+    setLoading(true);
+    fetchCards({ type: 'Battlefield' })
+      .then(({ cards }) => {
+        const sorted = (cards || []).sort((a, b) => a.name.localeCompare(b.name));
+        setBfs(sorted);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [visible]);
+
+  const displayed = search.trim()
+    ? bfs.filter(c => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : bfs;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+        <View style={styles.editPickerHeader}>
+          <Text style={styles.editPickerTitle}>CHOOSE BATTLEFIELD</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.editPickerSearch}>
+          <Ionicons name="search" size={15} color={COLORS.textMuted} />
+          <TextInput
+            style={styles.editPickerSearchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search battlefields…"
+            placeholderTextColor={COLORS.textMuted}
+            autoCorrect={false}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={15} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <FlatList
+          data={displayed}
+          keyExtractor={item => item.id}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: SPACING.md }}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <TouchableOpacity
+              style={[styles.editLegendItem, !currentValue && styles.editLegendItemActive]}
+              onPress={() => { onSelect(null); onClose(); }}
+            >
+              <View style={[styles.editLegendThumb, { backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="close-circle-outline" size={20} color={COLORS.textMuted} />
+              </View>
+              <Text style={{ color: COLORS.textMuted, fontSize: 14, fontWeight: '600' }}>No battlefield</Text>
+            </TouchableOpacity>
+          }
+          ListEmptyComponent={
+            <Text style={{ color: COLORS.textMuted, textAlign: 'center', padding: SPACING.lg }}>
+              {loading ? 'Loading battlefields…' : `No results for "${search}"`}
+            </Text>
+          }
+          renderItem={({ item: card }) => {
+            const isActive = currentValue === card.name;
+            return (
+              <TouchableOpacity
+                style={[styles.editLegendItem, isActive && styles.editLegendItemActive]}
+                onPress={() => { onSelect(card.name); onClose(); }}
+              >
+                {card.art?.thumbnailUrl ? (
+                  <Image source={{ uri: card.art.thumbnailUrl }} style={styles.editLegendThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.editLegendThumb, { backgroundColor: COLORS.bgElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="map-outline" size={18} color={COLORS.textMuted} />
+                  </View>
+                )}
+                <Text style={{ color: COLORS.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 }} numberOfLines={1}>{card.name}</Text>
+                {isActive && <Ionicons name="checkmark" size={16} color={COLORS.win} />}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </SafeAreaView>
+    </Modal>
+  );
+};
+
 // ── Match Detail Modal ────────────────────────────────────────────────────────
-const MatchDetailModal = ({ match, visible, onClose }) => {
+const MatchDetailModal = ({ match, visible, onClose, premium, onSave }) => {
+  const [editing, setEditing]             = useState(false);
+  const [oppName, setOppName]             = useState('');
+  const [p1Legend, setP1Legend]            = useState(null);
+  const [p2Legend, setP2Legend]            = useState(null);
+  const [p1BF, setP1BF]                   = useState(null);
+  const [p2BF, setP2BF]                   = useState(null);
+  const [showP1LegendPicker, setShowP1LegendPicker] = useState(false);
+  const [showP2LegendPicker, setShowP2LegendPicker] = useState(false);
+  const [showP1BFPicker, setShowP1BFPicker]          = useState(false);
+  const [showP2BFPicker, setShowP2BFPicker]          = useState(false);
+
+  // Sync state when match changes or edit mode toggles
+  useEffect(() => {
+    if (!match) return;
+    setOppName(match.players?.[1]?.name || '');
+    setP1Legend(match.players?.[0]?.legend || null);
+    setP2Legend(match.players?.[1]?.legend || null);
+    setP1BF(match.players?.[0]?.battlefield || null);
+    setP2BF(match.players?.[1]?.battlefield || null);
+    setEditing(false);
+  }, [match?.id, visible]);
+
   if (!match) return null;
 
   const player1 = match.players?.[0];
@@ -49,9 +291,48 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
   const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-  const LegendChip = ({ legend, align = 'left' }) => {
-    if (!legend) return null;
-    return (
+  const handleSave = async () => {
+    const updated = JSON.parse(JSON.stringify(match));
+    // Update opponent name
+    if (updated.players?.[1]) updated.players[1].name = oppName.trim() || 'Opponent';
+    // Update winner name if opponent was the winner
+    if (match.winner === player2?.name && oppName.trim()) updated.winner = oppName.trim();
+    // Update legends
+    if (updated.players?.[0]) updated.players[0].legend = p1Legend;
+    if (updated.players?.[1]) updated.players[1].legend = p2Legend;
+    // Update battlefields (Bo1 only — stored on player level)
+    if (!isBo3) {
+      if (updated.players?.[0]) updated.players[0].battlefield = p1BF;
+      if (updated.players?.[1]) updated.players[1].battlefield = p2BF;
+    }
+    // Also update game scores opponent name for Bo3
+    if (updated.games) {
+      updated.games.forEach(g => {
+        if (g.scores) {
+          const oppScore = g.scores.find(s => s.name === player2?.name);
+          if (oppScore && oppName.trim()) oppScore.name = oppName.trim();
+        }
+        if (g.winner === player2?.name && oppName.trim()) g.winner = oppName.trim();
+      });
+    }
+    // Update gameWins keys
+    if (updated.gameWins && player2?.name && oppName.trim() && oppName.trim() !== player2.name) {
+      const wins = updated.gameWins[player2.name];
+      delete updated.gameWins[player2.name];
+      updated.gameWins[oppName.trim()] = wins;
+    }
+
+    const ok = await saveMatch(updated);
+    if (ok) {
+      setEditing(false);
+      onSave?.();
+    } else {
+      Alert.alert('Error', 'Failed to save changes.');
+    }
+  };
+
+  const LegendChip = ({ legend, align = 'left', onEdit }) => {
+    const content = legend ? (
       <View style={[styles.detailLegendChip, align === 'right' && { flexDirection: 'row-reverse' }]}>
         {legend.art ? (
           <Image source={{ uri: legend.art }} style={styles.detailLegendThumb} resizeMode="cover" />
@@ -69,7 +350,41 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
           )}
         </View>
       </View>
+    ) : (
+      <Text style={{ color: COLORS.textMuted, fontSize: 11 }}>No legend</Text>
     );
+
+    if (editing && onEdit) {
+      return (
+        <TouchableOpacity onPress={onEdit} style={styles.editTappable}>
+          {content}
+          <Ionicons name="pencil" size={10} color={COLORS.goldLight} />
+        </TouchableOpacity>
+      );
+    }
+    return content;
+  };
+
+  const BFChip = ({ battlefield, align = 'left', onEdit }) => {
+    if (!battlefield && !editing) return null;
+    const content = (
+      <View style={[styles.detailBFChip, align === 'right' && { flexDirection: 'row-reverse' }]}>
+        <Ionicons name="map-outline" size={11} color={COLORS.textMuted} />
+        <Text style={[styles.detailBFText, align === 'right' && { textAlign: 'right' }]} numberOfLines={2}>
+          {battlefield || 'No battlefield'}
+        </Text>
+      </View>
+    );
+
+    if (editing && onEdit) {
+      return (
+        <TouchableOpacity onPress={onEdit} style={styles.editTappable}>
+          {content}
+          <Ionicons name="pencil" size={10} color={COLORS.goldLight} />
+        </TouchableOpacity>
+      );
+    }
+    return content;
   };
 
   return (
@@ -85,11 +400,22 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
             colors={isWin ? WIN_GRADIENT : LOSS_GRADIENT}
             style={styles.detailHeader}
           >
-            <View style={[styles.detailResultBadge, { backgroundColor: accent + '25', borderColor: accent }]}>
-              <Ionicons name={isWin ? 'trophy' : 'close-circle'} size={13} color={accent} />
-              <Text style={[styles.detailResultText, { color: accent }]}>
-                {isWin ? 'VICTORY' : 'DEFEAT'}
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm }}>
+              <View style={[styles.detailResultBadge, { backgroundColor: accent + '25', borderColor: accent }]}>
+                <Ionicons name={isWin ? 'trophy' : 'close-circle'} size={13} color={accent} />
+                <Text style={[styles.detailResultText, { color: accent }]}>
+                  {isWin ? 'VICTORY' : 'DEFEAT'}
+                </Text>
+              </View>
+              {premium && !editing && (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => setEditing(true)}
+                >
+                  <Ionicons name="pencil" size={13} color={COLORS.goldLight} />
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <Text style={styles.detailDate}>{dateStr}</Text>
             <Text style={styles.detailTime}>{timeStr}</Text>
@@ -108,13 +434,8 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
               <View style={styles.detailPlayerCol}>
                 <Text style={[styles.detailPlayerLabel, { color: accent }]}>YOU</Text>
                 <Text style={[styles.detailPlayerName, { color: accent }]} numberOfLines={1}>{player1?.name}</Text>
-                <LegendChip legend={player1?.legend} align="left" />
-                {!isBo3 && player1?.battlefield ? (
-                  <View style={styles.detailBFChip}>
-                    <Ionicons name="map-outline" size={11} color={COLORS.textMuted} />
-                    <Text style={styles.detailBFText} numberOfLines={2}>{player1.battlefield}</Text>
-                  </View>
-                ) : null}
+                <LegendChip legend={editing ? p1Legend : player1?.legend} align="left" onEdit={() => setShowP1LegendPicker(true)} />
+                {!isBo3 && <BFChip battlefield={editing ? p1BF : player1?.battlefield} align="left" onEdit={() => setShowP1BFPicker(true)} />}
               </View>
 
               <Text style={styles.detailVs}>VS</Text>
@@ -122,14 +443,19 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
               {/* Opponent */}
               <View style={[styles.detailPlayerCol, { alignItems: 'flex-end' }]}>
                 <Text style={styles.detailPlayerLabel}>OPP</Text>
-                <Text style={styles.detailPlayerName} numberOfLines={1}>{player2?.name}</Text>
-                <LegendChip legend={player2?.legend} align="right" />
-                {!isBo3 && player2?.battlefield ? (
-                  <View style={[styles.detailBFChip, { flexDirection: 'row-reverse' }]}>
-                    <Ionicons name="map-outline" size={11} color={COLORS.textMuted} />
-                    <Text style={[styles.detailBFText, { textAlign: 'right' }]} numberOfLines={2}>{player2.battlefield}</Text>
-                  </View>
-                ) : null}
+                {editing ? (
+                  <TextInput
+                    style={styles.editNameInput}
+                    value={oppName}
+                    onChangeText={setOppName}
+                    placeholder="Opponent"
+                    placeholderTextColor={COLORS.textMuted}
+                  />
+                ) : (
+                  <Text style={styles.detailPlayerName} numberOfLines={1}>{player2?.name}</Text>
+                )}
+                <LegendChip legend={editing ? p2Legend : player2?.legend} align="right" onEdit={() => setShowP2LegendPicker(true)} />
+                {!isBo3 && <BFChip battlefield={editing ? p2BF : player2?.battlefield} align="right" onEdit={() => setShowP2BFPicker(true)} />}
               </View>
             </View>
 
@@ -144,13 +470,10 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
                   const gAccent = gIsWin ? WIN_ACCENT : LOSS_ACCENT;
                   return (
                     <View key={idx} style={[styles.detailGameRow, { borderColor: gAccent + '40' }]}>
-                      {/* Game number + result */}
                       <View style={[styles.detailGameBadge, { backgroundColor: gAccent + '20', borderColor: gAccent }]}>
                         <Text style={[styles.detailGameNum, { color: gAccent }]}>G{game.game}</Text>
                         <Ionicons name={gIsWin ? 'trophy' : 'close-circle'} size={11} color={gAccent} />
                       </View>
-
-                      {/* P1 side */}
                       <View style={styles.detailGamePlayer}>
                         <Text style={[styles.detailGamePoints, { color: gIsWin ? WIN_ACCENT : COLORS.textPrimary }]}>
                           {gP1?.points ?? '–'}
@@ -162,10 +485,7 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
                           </View>
                         ) : null}
                       </View>
-
                       <Text style={styles.detailGameDash}>–</Text>
-
-                      {/* P2 side */}
                       <View style={[styles.detailGamePlayer, { alignItems: 'flex-end' }]}>
                         <Text style={[styles.detailGamePoints, { color: !gIsWin ? LOSS_ACCENT : COLORS.textPrimary }]}>
                           {gP2?.points ?? '–'}
@@ -192,13 +512,31 @@ const MatchDetailModal = ({ match, visible, onClose }) => {
 
           </ScrollView>
 
-          {/* Close button */}
-          <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
-            <Text style={styles.detailCloseBtnText}>CLOSE</Text>
-          </TouchableOpacity>
+          {/* Bottom buttons */}
+          {editing ? (
+            <View style={styles.editBottomRow}>
+              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditing(false)}>
+                <Text style={styles.editCancelBtnText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.editSaveBtn} onPress={handleSave}>
+                <Ionicons name="checkmark" size={16} color={COLORS.textPrimary} />
+                <Text style={styles.editSaveBtnText}>SAVE</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
+              <Text style={styles.detailCloseBtnText}>CLOSE</Text>
+            </TouchableOpacity>
+          )}
 
         </View>
       </View>
+
+      {/* Pickers */}
+      <HistoryLegendPicker visible={showP1LegendPicker} currentValue={p1Legend} onSelect={setP1Legend} onClose={() => setShowP1LegendPicker(false)} />
+      <HistoryLegendPicker visible={showP2LegendPicker} currentValue={p2Legend} onSelect={setP2Legend} onClose={() => setShowP2LegendPicker(false)} />
+      <HistoryBFPicker visible={showP1BFPicker} currentValue={p1BF} onSelect={setP1BF} onClose={() => setShowP1BFPicker(false)} />
+      <HistoryBFPicker visible={showP2BFPicker} currentValue={p2BF} onSelect={setP2BF} onClose={() => setShowP2BFPicker(false)} />
     </Modal>
   );
 };
@@ -614,6 +952,8 @@ export default function MatchHistoryScreen({ onPremiumChange }) {
         match={selectedMatch}
         visible={selectedMatch !== null}
         onClose={() => setSelectedMatch(null)}
+        premium={premium}
+        onSave={() => { load(); setSelectedMatch(null); }}
       />
 
       <PremiumGate
@@ -731,6 +1071,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailCloseBtnText: { fontSize: 13, fontWeight: '800', color: COLORS.textSecondary, letterSpacing: 2 },
+
+  // ── Edit mode styles ──
+  editBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: SPACING.sm, paddingVertical: 4,
+    borderRadius: RADIUS.sm, borderWidth: 1,
+    borderColor: COLORS.goldDark, backgroundColor: COLORS.goldDark + '20',
+  },
+  editBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.goldLight, letterSpacing: 1 },
+  editNameInput: {
+    fontSize: 14, fontWeight: '700', color: COLORS.textPrimary,
+    borderBottomWidth: 1, borderBottomColor: COLORS.goldLight,
+    paddingVertical: 4, textAlign: 'right', minWidth: 80,
+  },
+  editTappable: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: COLORS.goldDark + '50', borderStyle: 'dashed',
+    borderRadius: RADIUS.sm, padding: 4,
+  },
+  editBottomRow: {
+    flexDirection: 'row', gap: SPACING.sm,
+    margin: SPACING.md, marginTop: 0,
+  },
+  editCancelBtn: {
+    flex: 1, padding: SPACING.md, borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: COLORS.border, alignItems: 'center',
+  },
+  editCancelBtnText: { fontSize: 13, fontWeight: '800', color: COLORS.textSecondary, letterSpacing: 2 },
+  editSaveBtn: {
+    flex: 1, padding: SPACING.md, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.goldDark, borderWidth: 1, borderColor: COLORS.gold,
+    alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: SPACING.xs,
+  },
+  editSaveBtnText: { fontSize: 13, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: 2 },
+
+  // ── Picker styles (history edit) ──
+  editPickerHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  editPickerTitle: { fontSize: 13, fontWeight: '800', color: COLORS.goldLight, letterSpacing: 3 },
+  editPickerSearch: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    margin: SPACING.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.bgInput, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  editPickerSearchInput: { flex: 1, color: COLORS.textPrimary, fontSize: 14 },
+  editLegendItem: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    padding: SPACING.sm, borderRadius: RADIUS.sm,
+    marginBottom: SPACING.xs,
+  },
+  editLegendItemActive: { backgroundColor: COLORS.bgElevated },
+  editLegendThumb: { width: 40, height: 40, borderRadius: RADIUS.sm, overflow: 'hidden' },
 
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

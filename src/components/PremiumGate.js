@@ -2,18 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import RevenueCatUI from 'react-native-purchases-ui';
+// TODO: Re-enable RevenueCat when freemium is activated
+// import RevenueCatUI from 'react-native-purchases-ui';
 import { COLORS, SPACING, RADIUS } from '../utils/theme';
-import {
-  getOfferings, purchasePackage, restorePurchases, ENTITLEMENT_ID,
-} from '../utils/purchases';
+// import {
+//   getOfferings, purchasePackage, restorePurchases, ENTITLEMENT_ID,
+// } from '../utils/purchases';
 
 // Features listed on the paywall
 const PREMIUM_FEATURES = [
   { icon: 'time',          label: 'Unlimited match history' },
-  { icon: 'albums',        label: 'Unlimited deck slots'    },
+  { icon: 'create',        label: 'Edit past matches — fix legends, battlefields & opponents' },
+  { icon: 'albums',        label: 'Unlimited deck slots' },
+  { icon: 'bar-chart',     label: 'Deck analytics — mana curve & card breakdown' },
   { icon: 'stats-chart',   label: 'Advanced stats — win rate by legend & battlefield' },
-  { icon: 'trophy',        label: 'Matchup matrix'          },
+  { icon: 'trophy',        label: 'Matchup matrix' },
 ];
 
 export default function PremiumGate({ visible, onClose, onUnlock, reason }) {

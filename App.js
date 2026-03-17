@@ -10,7 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
-import { initPurchases, addCustomerInfoListener } from './src/utils/purchases';
+// TODO: Re-enable RevenueCat when freemium is activated
+// import { initPurchases, addCustomerInfoListener } from './src/utils/purchases';
 
 // Hold native splash until we're ready to take over
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -228,6 +229,11 @@ function OnboardingScreen({ onDone }) {
             <Text style={styles.inputHint}>You can change this later in Settings</Text>
           </View>
 
+          {/* Legal disclaimer */}
+          <Text style={styles.legalText}>
+            Riftbound Companion was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.  Riot Games does not endorse or sponsor this project.
+          </Text>
+
           {/* CTA */}
           <TouchableOpacity
             style={[styles.startBtn, !name.trim() && styles.startBtnDim]}
@@ -265,11 +271,11 @@ function Root() {
       if (!stored) setShowOnboarding(true);
       else setUsernameState(stored);
 
-      // Initialize RevenueCat
-      await initPurchases();
-      addCustomerInfoListener((isPremium) => {
-        console.log('[RevenueCat] Premium status changed:', isPremium);
-      });
+      // TODO: Re-enable RevenueCat when freemium is activated
+      // await initPurchases();
+      // addCustomerInfoListener((isPremium) => {
+      //   console.log('[RevenueCat] Premium status changed:', isPremium);
+      // });
 
       setAppReady(true);
       // Hand off from native splash to our JS splash
@@ -389,6 +395,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#3A2A5C',
   },
   inputHint: { fontSize: 12, color: '#4A4A6A', textAlign: 'center' },
+  legalText: { fontSize: 10, color: '#4A4A6A', textAlign: 'center', lineHeight: 15 },
   startBtn: { borderRadius: 14, overflow: 'hidden' },
   startBtnDim: { opacity: 0.7 },
   startBtnGrad: {

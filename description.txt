@@ -1,0 +1,226 @@
+RIFTBOUND COMPANION
+Project Description & Use Cases
+================================================================================
+
+OVERVIEW
+--------
+Riftbound Companion is a mobile companion app for Riftbound players.
+It gives players the tools they need to track matches, build and
+analyze decks, browse the full card database, and manage in-person card trades.
+
+The app is built with React Native (Expo) and runs on both iOS and Android.
+It currently sources its card data from the RiftCodex public API
+(https://api.riftcodex.com). Once a Riot Developer API key is obtained, the
+app will transition to use the official Riot Games API for card data.
+
+Riftbound Companion was created under Riot Games' "Legal Jibber Jabber" policy
+using assets owned by Riot Games. Riot Games does not endorse or sponsor this
+project.
+
+
+TARGET AUDIENCE
+---------------
+- Competitive and casual Riftbound players
+- Players who attend local meetups, tournaments, or play at game stores
+- Deck builders and theory-crafters looking for analytics on their builds
+- Players who trade cards in person and want a way to organize trades
+
+
+================================================================================
+FEATURES & USE CASES
+================================================================================
+
+1. MATCH SCORE TRACKER
+-----------------------
+A real-time score tracker designed for head-to-head play.
+
+Use case: Two friends sit down at a local game store for a Best-of-3 series.
+They open Riftbound Companion, select their legends and a battlefield, and tap
+to increment points as the game progresses. The app tracks individual game
+wins within the series, determines the overall winner, and saves the full
+match record automatically.
+
+Features:
+  - Support for Best-of-1 and Best-of-3 match formats
+  - Configurable win conditions (first to 7, 8, 9 or 10 points)
+  - Legend picker with searchable legend database and domain display
+  - Battlefield selection from the full battlefield card pool
+  - Visual point pips and game-win indicators
+  - Haptic feedback on score changes
+  - Automatic match saving with full metadata
+
+
+2. MATCH HISTORY & ANALYTICS
+-----------------------------
+A historical record of every match played, with filtering and statistics.
+
+Use case: A player has been grinding matches all week and wants to see how
+they're performing. They open match history, filter by wins to review their
+best games, check their overall win rate, and edit a match from yesterday
+where they accidentally selected the wrong legend.
+
+Features:
+  - Chronological match log with win/loss indicators
+  - Win rate calculation and display
+  - Filter matches by outcome (wins, losses, all)
+  - Edit past matches to correct legends, battlefields, opponents, or scores
+  - Delete individual matches or clear entire history
+  - Color-coded win/loss badges for quick scanning
+
+
+3. CARD DATABASE BROWSER
+--------------------------
+A searchable, filterable browser for the complete Riftbound card
+pool.
+
+Use case: A player hears about a card during a stream and wants to look it
+up quickly. They search by name, find it instantly, and tap to see its full
+art, stats, rules text, and flavor text. Another player wants to browse all
+Epic rarity spells in the Fury domain to find options for a new deck idea.
+
+Features:
+  - Full card database with search by name
+  - Filter by domain (Fury, Body, Calm, Mind, Order, Chaos, Colorless)
+  - Filter by card type (Unit, Spell, Battlefield, Gear, Rune, Legend, Champion)
+  - Filter by rarity (Common, Rare, Epic, Showcase)
+  - Paginated browsing (loads 20 cards per page for performance)
+  - Detailed card modal showing art, cost, power, might, rules, and flavor text
+
+Data source: Currently powered by the RiftCodex API with a 24-hour local
+cache for offline access and fast loading. Will transition to the official
+Riot Games API once developer access is granted.
+
+
+4. DECK BUILDER & ANALYTICS
+-----------------------------
+A full-featured deck construction tool with validation rules and statistical
+analysis.
+
+Use case: A player wants to build a new deck around a specific legend. They
+select the legend, which automatically filters the card pool to only show
+cards matching that legend's domains. They pick a champion, add battlefields
+and runes, then fill out the main deck and sideboard. Before heading to a
+tournament, they open the deck analytics modal to review their rune energy curve,
+power distribution, and card type breakdown to make sure the deck is balanced.
+
+Features:
+  - Create, rename, and delete decks
+  - Full deck structure enforcement:
+      * 1 Legend (defines available domains/colors)
+      * 1 Champion (must match legend's champion type)
+      * Up to 3 Battlefields
+      * Up to 12 Runes
+      * Up to 40 Main Deck cards
+      * Up to 8 Sideboard cards
+      * Maximum 3 copies of any card across main deck and sideboard
+  - Domain-locked card filtering (cards outside the legend's colors are hidden)
+  - Integrated card browser for adding cards directly to decks
+  - Share deck list as formatted text for messaging or social media
+  - Deck analytics modal with:
+      * Average mana cost and power statistics
+      * Mana cost distribution chart
+      * Power distribution chart
+      * Card type breakdown (Units, Spells, Gear, Champions)
+      * Domain split visualization
+
+
+5. TRADE MANAGER
+-----------------
+A trade scheduling and tracking tool for players who trade cards in person.
+
+Use case: Two players agree on a card trade at a local meetup next Saturday.
+One player opens Riftbound Companion, creates a trade entry with the other
+player's name, adds the cards being exchanged, sets the meetup date, time,
+and location, and notes the agreed price. The app schedules a push
+notification reminder for the day before. When they're ready to meet, the
+player shares a trade summary card (as an image or text) so both parties
+have the details confirmed. After the trade is done, they mark it as
+completed.
+
+Features:
+  - Create trades with full details:
+      * Trader name
+      * Cards being traded (selected from the card browser)
+      * Meetup date, time, and location
+      * Notes (card conditions, edition details, etc.)
+      * Agreed price
+  - Automatic push notification reminder one day before the meetup
+  - Trade status tracking (Upcoming, Completed, Cancelled)
+  - Filter trades by status
+  - Share trade details as formatted text
+  - Share trade details as a styled image card (for messaging apps)
+  - Optional e-transfer email display on shared trade cards for payment
+  - Edit or delete trades at any time
+
+
+6. SETTINGS & PERSONALIZATION
+-------------------------------
+Use case: A player who frequently trades cards wants their e-transfer email
+to appear on every shared trade card so buyers can pay easily. They enter
+their email in settings and toggle the option on. They also set a display
+name that's different from their in-app username to use on trade cards.
+
+Features:
+  - Change display name (used on shared trade cards)
+  - Configure e-transfer email for trade payments
+  - Toggle e-transfer email visibility on shared trade cards
+
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+Platform:           React Native (Expo), iOS & Android
+Data Storage:       Local-only (AsyncStorage), no cloud backend
+Card Data Source:    RiftCodex API (https://api.riftcodex.com)
+                    Planned migration to official Riot Games API
+Notifications:      expo-notifications (local push for trade reminders)
+Sharing:            expo-sharing + react-native-view-shot for image export
+Orientation:        Portrait only
+Theme:              Dark UI with gold and purple accents inspired by
+                    Riftbound's visual identity
+
+
+================================================================================
+MONETIZATION (PLANNED)
+================================================================================
+
+The app includes a one-time lifetime purchase option (not a subscription) that
+will unlock premium features when activated. The monetization system is fully
+built using RevenueCat but is currently disabled -- all features are available
+to all users for free. The premium paywall will be enabled once the app reaches
+its initial download targets.
+
+
+FREE FEATURES (available to all users)
+---------------------------------------
+  - Match score tracker (all formats, all win conditions)
+  - Legend and battlefield selection
+  - Automatic match saving
+  - Match history (limited to the 10 most recent matches)
+  - Card database browser with full search and filtering
+  - Deck builder (limited to 3 deck slots)
+  - Basic deck structure enforcement and domain-locked filtering
+  - Trade manager (create, edit, schedule, share trades)
+  - Trade notification reminders
+  - Settings and personalization
+
+
+PREMIUM FEATURES (one-time lifetime purchase)
+----------------------------------------------
+  - Unlimited match history (all matches visible, no 10-match cap)
+  - Edit past matches (fix legends, battlefields, and opponents retroactively)
+  - Unlimited deck slots (no 3-deck cap)
+  - Deck analytics (energy curve, power distribution, card type and domain
+    breakdown charts)
+  - Advanced stats (win rate breakdowns by legend and by battlefield)
+  - Matchup matrix (track performance against specific opponents and legends)
+
+
+================================================================================
+LEGAL
+================================================================================
+
+Riftbound Companion was created under Riot Games' "Legal Jibber Jabber" policy
+using assets owned by Riot Games. Riot Games does not endorse or sponsor this
+project.

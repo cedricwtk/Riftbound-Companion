@@ -15,11 +15,14 @@ const ALL_DOMAINS    = ['', 'Fury', 'Body', 'Calm', 'Mind', 'Order', 'Chaos', 'C
 // deckCounts: { [cardId]: number } — current count in deck
 // maxCount:   per-card cap (default 3, battlefields use 1)
 // onAdd / onRemove: increment/decrement callbacks
+const isUnique = (card) => card.rules?.some(r => r.includes('[Unique]'));
+
 const CardTile = ({ card, onPress, dimmed, deckCounts, maxCount = 3, onAdd, onRemove }) => {
   const domainColor = DOMAIN_COLORS[card.domain] || COLORS.textSecondary;
   const rarityColor = RARITIES.find(r => r.value === card.rarity)?.color || COLORS.textMuted;
   const count       = deckCounts ? (deckCounts[card.name] || 0) : 0;
-  const atMax       = count >= maxCount;
+  const effectiveMax = isUnique(card) ? 1 : maxCount;
+  const atMax       = count >= effectiveMax;
   const inDeck      = count > 0;
   const counterMode = !!deckCounts;
 
@@ -181,6 +184,8 @@ export default function CardsScreen({
   addToDeckLabel,
   forcedType,
   forcedDomains,
+  forcedTags,        // strict: ONLY show cards whose tags include any of these values
+  legendTags,        // soft: allow cards with no tags, exclude cards tagged for a different champion
   hideLegend,
   hideBattlefield,
   excludeRarity,     // exclude cards with this rarity (e.g. 'Showcase')
@@ -229,6 +234,31 @@ export default function CardsScreen({
     if (hideLegend)      filtered = filtered.filter(c => c.type !== 'Legend');
     if (hideBattlefield) filtered = filtered.filter(c => c.type !== 'Battlefield');
     if (excludeRarity)   filtered = filtered.filter(c => c.rarity !== excludeRarity);
+    if (forcedTags && forcedTags.length > 0) {
+      filtered = filtered.filter(c =>
+        c.tags?.some(t => forcedTags.includes(t))
+      );
+    }
+    // Soft tag filter: exclude cards tagged for a different champion.
+    // Units and Champions are always allowed regardless of tags.
+    // Gear with only generic tags (e.g. "Equipment") is allowed — only
+    // exclude Gear when it carries a champion-specific tag that doesn't
+    // match the legend (e.g. "Ornn" gear in a Jax deck).
+    if (legendTags && legendTags.length > 0) {
+      filtered = filtered.filter(c => {
+        if (!c.tags || c.tags.length === 0) return true;             // no tags → allowed
+        if (c.type === 'Unit' || c.type === 'Champion') return true; // units always allowed
+        if (c.tags.some(t => legendTags.includes(t))) return true;   // matches legend → allowed
+        // For Gear: allow if none of its tags are champion-specific
+        // (champion tags overlap with legend tags across all legends,
+        //  so a tag that doesn't match ANY legendTag is generic)
+        if (c.type === 'Gear') {
+          const hasChampionTag = c.tags.some(t => t !== 'Equipment');
+          return !hasChampionTag; // generic gear → allowed, champion gear → excluded
+        }
+        return false;                                                 // others must match
+      });
+    }
 
     setCards(prev => {
       const merged = reset ? filtered : [...prev, ...filtered];
@@ -245,7 +275,7 @@ export default function CardsScreen({
     else setPage(2);
     setLoading(false);
   }, [search, filterDomain, filterType, filterRarity, page, loading,
-      forcedType, forcedDomains, hideLegend, hideBattlefield, excludeRarity]);
+      forcedType, forcedDomains, forcedTags, legendTags, hideLegend, hideBattlefield, excludeRarity]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadCards(true), 400);

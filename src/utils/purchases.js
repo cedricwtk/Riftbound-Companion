@@ -1,6 +1,7 @@
-import Purchases from 'react-native-purchases';
-import { Platform } from 'react-native';
-import { setPremium } from './storage';
+// TODO: Re-enable RevenueCat when freemium is activated
+// import Purchases from 'react-native-purchases';
+// import { Platform } from 'react-native';
+// import { setPremium } from './storage';
 
 // RevenueCat API keys
 const API_KEY = 'test_gxNyDcBlppLjItfxJbAwiazuWVJ';

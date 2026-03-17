@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../utils/theme';
 import { isPremium } from '../utils/storage';
-import { syncPremiumStatus } from '../utils/purchases';
+// TODO: Re-enable RevenueCat when freemium is activated
+// import { syncPremiumStatus } from '../utils/purchases';
 import ScoreScreen from '../screens/ScoreScreen';
 import CardsScreen from '../screens/CardsScreen';
 import DeckBuilderScreen from '../screens/DeckBuilderScreen';
 import TradesScreen from '../screens/TradesScreen';
 import MatchHistoryScreen from '../screens/MatchHistoryScreen';
+import MastersetScreen from '../screens/MastersetScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -33,8 +35,7 @@ export default function AppNavigator({ username }) {
   const [premium, setPremiumState] = useState(false);
 
   const checkPremium = useCallback(async () => {
-    // Sync with RevenueCat then read local state
-    await syncPremiumStatus().catch(() => {});
+    // TODO: Re-enable syncPremiumStatus() when freemium is activated
     const p = await isPremium();
     setPremiumState(p);
   }, []);
@@ -69,11 +70,12 @@ export default function AppNavigator({ username }) {
           },
           tabBarIcon: ({ focused, color }) => {
             let iconName;
-            if      (route.name === 'Score')   iconName = focused ? 'trophy'          : 'trophy-outline';
-            else if (route.name === 'History') iconName = focused ? 'time'            : 'time-outline';
-            else if (route.name === 'Cards')   iconName = focused ? 'albums'          : 'albums-outline';
-            else if (route.name === 'Decks')   iconName = focused ? 'layers'          : 'layers-outline';
-            else if (route.name === 'Trades')  iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline';
+            if      (route.name === 'Score')     iconName = focused ? 'trophy'            : 'trophy-outline';
+            else if (route.name === 'History')   iconName = focused ? 'time'              : 'time-outline';
+            else if (route.name === 'Cards')     iconName = focused ? 'albums'            : 'albums-outline';
+            else if (route.name === 'Decks')     iconName = focused ? 'layers'            : 'layers-outline';
+            else if (route.name === 'Trades')    iconName = focused ? 'swap-horizontal'   : 'swap-horizontal-outline';
+            else if (route.name === 'Masterset') iconName = focused ? 'checkmark-circle'  : 'checkmark-circle-outline';
             return <Ionicons name={iconName} size={22} color={color} />;
           },
         })}
@@ -88,7 +90,8 @@ export default function AppNavigator({ username }) {
         <Tab.Screen name="Decks"  options={{ tabBarLabel: 'DECKS' }}>
           {(props) => <DeckBuilderScreen {...props} onPremiumChange={checkPremium} />}
         </Tab.Screen>
-        <Tab.Screen name="Trades" component={TradesScreen}      options={{ tabBarLabel: 'TRADES' }} />
+        <Tab.Screen name="Trades"    component={TradesScreen}    options={{ tabBarLabel: 'TRADES' }} />
+        <Tab.Screen name="Masterset" component={MastersetScreen} options={{ tabBarLabel: 'COLLECT' }} />
       </Tab.Navigator>
     </NavigationContainer>
     </View>

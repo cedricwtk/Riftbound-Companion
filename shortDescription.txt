@@ -1,0 +1,19 @@
+RIFTBOUND COMPANION
+
+A mobile companion app for Riftbound players on iOS and Android.
+Track matches, build decks, browse cards, and manage trades -- all in one app.
+
+KEY FEATURES
+- Match Score Tracker: Real-time Bo1/Bo3 scoring with legend and battlefield selection
+- Match History: Win/loss log with win rate stats and match editing
+- Card Browser: Full searchable card database with domain, type, and rarity filters
+- Deck Builder: Build decks with rule enforcement, domain filtering, and analytics
+- Trade Manager: Schedule trades, set reminders, and share trade cards via text or image
+
+MONETIZATION
+Currently free for all users. A planned one-time premium purchase will unlock
+unlimited match history, unlimited deck slots, deck analytics, advanced stats,
+and matchup tracking.
+
+Riftbound Companion was created under Riot Games' "Legal Jibber Jabber" policy
+using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.

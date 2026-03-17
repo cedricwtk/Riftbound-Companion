@@ -4,7 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL    = 'https://api.riftcodex.com';
-const CACHE_KEY   = 'riftbound_cards_cache';
+const CACHE_KEY   = 'riftbound_cards_cache_v3'; // bumped when card shape changed
 const CACHE_TTL   = 24 * 60 * 60 * 1000; // 24 hours in ms
 
 // In-memory cache for current session (avoids re-parsing AsyncStorage every call)
@@ -50,14 +50,22 @@ const fetchAllFromAPI = async () => {
   } while (page <= totalPages);
 
   return allItems.map(card => ({
-    id:      card.id,
-    name:    card.name,
-    tags:    card.tags || [],
-    type:    card.classification?.type || '',
-    domain:  card.classification?.domain?.[0] || 'Colorless',
-    domains: card.classification?.domain || ['Colorless'],
-    rarity:  card.classification?.rarity || '',
-    set:     card.set?.set_id || '',
+    id:               card.id,
+    name:             card.name,
+    tags:             card.tags || [],
+    type:             card.classification?.type || '',
+    domain:           card.classification?.domain?.[0] || 'Colorless',
+    domains:          card.classification?.domain || ['Colorless'],
+    rarity:           card.classification?.rarity || '',
+    set:              card.set?.id || card.set?.set_id || (card.public_code ? card.public_code.split('-')[0] : '') || '',
+    set_label:        card.set?.label || card.set?.id || card.set?.set_id || '',
+    collector_number: card.collector_number ?? null,
+    public_code:      card.public_code || '',
+    metadata: {
+      alternate_art: card.metadata?.alternate_art ?? false,
+      overnumbered:  card.metadata?.overnumbered  ?? false,
+      signature:     card.metadata?.signature      ?? false,
+    },
     stats: {
       cost:  card.attributes?.energy ?? undefined,
       power: card.attributes?.power  ?? undefined,
@@ -135,4 +143,6 @@ export const RARITIES = [
   { value: 'Rare',     label: 'Rare',     color: '#9B59B6' },
   { value: 'Epic',     label: 'Epic',     color: '#E8820C' },
   { value: 'Showcase', label: 'Showcase', color: '#C9A84C' },
+  { value: 'Signed',   label: 'Signed',   color: '#C0C8D8' },
+  { value: 'Promo',    label: 'Promo',    color: '#E84393' },
 ];

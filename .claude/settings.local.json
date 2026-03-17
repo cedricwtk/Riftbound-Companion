@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.riftcodex.com)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=1\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''total:'', d.get\\(''total''\\), ''pages:'', d.get\\(''pages''\\)\\)\")",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=656\")",
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=700\")",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=100\")",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=100\" -o /tmp/riftbound_p1.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=2&size=100\" -o /tmp/riftbound_p2.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=3&size=100\" -o /tmp/riftbound_p3.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=4&size=100\" -o /tmp/riftbound_p4.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=5&size=100\" -o /tmp/riftbound_p5.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=6&size=100\" -o /tmp/riftbound_p6.json)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=7&size=100\" -o /tmp/riftbound_p7.json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(len\\(d.get\\(''items'',[]\\)\\),''items''\\)\")",
+      "Bash(python3:*)",
+      "Bash(curl -s \"https://api.riftcodex.com/cards?page=1&size=100\" \"https://api.riftcodex.com/cards?page=2&size=100\" \"https://api.riftcodex.com/cards?page=3&size=100\" \"https://api.riftcodex.com/cards?page=4&size=100\" \"https://api.riftcodex.com/cards?page=5&size=100\" \"https://api.riftcodex.com/cards?page=6&size=100\" \"https://api.riftcodex.com/cards?page=7&size=100\")",
+      "Bash(npx eas build --platform android --profile preview --non-interactive)",
+      "Bash(npx eas build --platform android --profile production --non-interactive)",
+      "Bash(where npx)",
+      "Bash(where node)",
+      "Bash(cmd.exe /c \"where npx\")",
+      "Bash(export PATH=\"/c/Program Files/nodejs:/c/Users/Cedric/AppData/Roaming/npm:$PATH\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm install serve --save-dev)"
+    ]
+  }
+}

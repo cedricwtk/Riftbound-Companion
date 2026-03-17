@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DECKS_KEY    = 'riftbound_decks_v1';
-const SETTINGS_KEY = 'riftbound_settings';
+const DECKS_KEY      = 'riftbound_decks_v1';
+const SETTINGS_KEY   = 'riftbound_settings';
+const COLLECTION_KEY = 'riftbound_collection';
 
 // ── Decks ─────────────────────────────────────────────────────────────────────
 export const getDecks = async () => {
@@ -31,14 +32,36 @@ export const deleteDeck = async (deckId) => {
   } catch { return false; }
 };
 
+// ── Collection (Masterset) ────────────────────────────────────────────────────
+export const getCollection = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(COLLECTION_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+};
+
+export const saveCollection = async (collectionSet) => {
+  try {
+    await AsyncStorage.setItem(COLLECTION_KEY, JSON.stringify([...collectionSet]));
+    return true;
+  } catch { return false; }
+};
+
+export const toggleCollectionCard = async (cardId) => {
+  const collection = await getCollection();
+  if (collection.has(cardId)) collection.delete(cardId);
+  else collection.add(cardId);
+  await saveCollection(collection);
+  return collection;
+};
+
 // ── Premium ───────────────────────────────────────────────────────────────────
+// TODO: Re-enable freemium gating once download target is reached.
+// For now, all users get premium features.
 const PREMIUM_KEY = 'riftbound_premium';
 
 export const isPremium = async () => {
-  try {
-    const val = await AsyncStorage.getItem(PREMIUM_KEY);
-    return val === 'true';
-  } catch { return false; }
+  return true;
 };
 
 export const setPremium = async (value) => {

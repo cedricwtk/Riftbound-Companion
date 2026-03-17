@@ -6,10 +6,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import RevenueCatUI from 'react-native-purchases-ui';
+// TODO: Re-enable RevenueCat when freemium is activated
+// import RevenueCatUI from 'react-native-purchases-ui';
 import { COLORS, SPACING, RADIUS } from '../utils/theme';
 import { getSettings, saveSettings, isPremium as checkIsPremium } from '../utils/storage';
-import { restorePurchases, ENTITLEMENT_ID } from '../utils/purchases';
+// import { restorePurchases, ENTITLEMENT_ID } from '../utils/purchases';
 
 export default function SettingsScreen({ visible, onClose }) {
   const [eTransferEmail, setETransferEmail] = useState('');
@@ -30,24 +31,25 @@ export default function SettingsScreen({ visible, onClose }) {
     }
   }, [visible]);
 
-  const handleCustomerCenter = async () => {
-    try {
-      await RevenueCatUI.presentCustomerCenter();
-    } catch (err) {
-      console.error('[Settings] Customer center error:', err);
-      Alert.alert('Unavailable', 'Could not open subscription management.');
-    }
-  };
+  // TODO: Re-enable RevenueCat when freemium is activated
+  // const handleCustomerCenter = async () => {
+  //   try {
+  //     await RevenueCatUI.presentCustomerCenter();
+  //   } catch (err) {
+  //     console.error('[Settings] Customer center error:', err);
+  //     Alert.alert('Unavailable', 'Could not open subscription management.');
+  //   }
+  // };
 
-  const handleRestore = async () => {
-    const result = await restorePurchases();
-    if (result.success) {
-      setPremiumActive(true);
-      Alert.alert('Restored!', 'Your premium access has been restored.');
-    } else {
-      Alert.alert('No Purchases Found', 'We could not find any previous purchases to restore.');
-    }
-  };
+  // const handleRestore = async () => {
+  //   const result = await restorePurchases();
+  //   if (result.success) {
+  //     setPremiumActive(true);
+  //     Alert.alert('Restored!', 'Your premium access has been restored.');
+  //   } else {
+  //     Alert.alert('No Purchases Found', 'We could not find any previous purchases to restore.');
+  //   }
+  // };
 
   const handleSave = async () => {
     await saveSettings({
@@ -130,37 +132,7 @@ export default function SettingsScreen({ visible, onClose }) {
             </View>
           </View>
 
-          {/* Subscription / Premium */}
-          <Text style={styles.sectionLabel}>SUBSCRIPTION</Text>
-          <View style={styles.card}>
-            <View style={styles.premiumStatusRow}>
-              <Ionicons
-                name={premiumActive ? 'diamond' : 'diamond-outline'}
-                size={20}
-                color={premiumActive ? COLORS.goldLight : COLORS.textMuted}
-              />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[styles.toggleLabel, premiumActive && { color: COLORS.goldLight }]}>
-                  {premiumActive ? 'Premium Active' : 'Free Plan'}
-                </Text>
-                <Text style={styles.toggleHint}>
-                  {premiumActive ? 'Lifetime access · All features unlocked' : 'Upgrade for full access'}
-                </Text>
-              </View>
-            </View>
-
-            {premiumActive && (
-              <TouchableOpacity style={styles.manageBtn} onPress={handleCustomerCenter}>
-                <Ionicons name="settings-outline" size={15} color={COLORS.arcaneBright} />
-                <Text style={styles.manageBtnText}>Manage Subscription</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.manageBtn} onPress={handleRestore}>
-              <Ionicons name="refresh-outline" size={15} color={COLORS.arcaneBright} />
-              <Text style={styles.manageBtnText}>Restore Purchases</Text>
-            </TouchableOpacity>
-          </View>
+          {/* TODO: Re-enable subscription section when freemium is activated */}
         </ScrollView>
       </SafeAreaView>
     </Modal>

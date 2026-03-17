@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  TextInput, ScrollView, Animated, Alert, Vibration, FlatList, Image
+  TextInput, ScrollView, Animated, Alert, Vibration, FlatList, Image,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,26 +32,30 @@ const saveMatch = async (match) => {
 const clearHistory = async () => {}; // managed in MatchHistoryScreen
 
 // ── Point Pips ────────────────────────────────────────────────────────────────
-const PointPips = ({ points, max, color }) => (
-  <View style={styles.pipsRow}>
-    {Array.from({ length: max }).map((_, i) => (
-      <View
-        key={i}
-        style={[
-          styles.pip,
-          {
-            backgroundColor: i < points ? color : COLORS.pointEmpty,
-            borderColor: i < points ? color : COLORS.border,
-            shadowColor: i < points ? color : 'transparent',
-            shadowOpacity: i < points ? 0.8 : 0,
-            shadowRadius: 6,
-            elevation: i < points ? 4 : 0,
-          },
-        ]}
-      />
-    ))}
-  </View>
-);
+const PointPips = ({ points, max, color, compact }) => {
+  const pipSize = compact ? 16 : 24;
+  return (
+    <View style={[styles.pipsRow, compact && styles.pipsRowCompact]}>
+      {Array.from({ length: max }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.pip,
+            { width: pipSize, height: pipSize, borderRadius: pipSize / 2 },
+            {
+              backgroundColor: i < points ? color : COLORS.pointEmpty,
+              borderColor: i < points ? color : COLORS.border,
+              shadowColor: i < points ? color : 'transparent',
+              shadowOpacity: i < points ? 0.8 : 0,
+              shadowRadius: 6,
+              elevation: i < points ? 4 : 0,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+};
 
 // ── Game Wins Dots (Bo3) ──────────────────────────────────────────────────────
 const GameWinDots = ({ wins, total = 2 }) => (
@@ -65,7 +70,7 @@ const GameWinDots = ({ wins, total = 2 }) => (
 );
 
 // ── Player Card ───────────────────────────────────────────────────────────────
-const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, gameWins, matchFormat }) => {
+const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, gameWins, matchFormat, compact }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handleAdd = () => {
@@ -86,7 +91,7 @@ const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, ga
     <Animated.View style={[styles.playerCard, { transform: [{ scale: scaleAnim }] }]}>
       <LinearGradient
         colors={isWinner ? ['#2A2010', '#1A1506'] : [COLORS.bgCard, COLORS.bg]}
-        style={styles.playerCardGradient}
+        style={[styles.playerCardGradient, compact && styles.playerCardGradientCompact]}
       >
         {isWinner && (
           <View style={styles.winnerBadge}>
@@ -96,7 +101,7 @@ const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, ga
         )}
 
         <View style={styles.playerNameRow}>
-          <Text style={styles.playerName}>{player.name}</Text>
+          <Text style={[styles.playerName, compact && styles.playerNameCompact]}>{player.name}</Text>
           {matchFormat === 'bo3' && (
             <GameWinDots wins={gameWins} total={2} />
           )}
@@ -108,28 +113,33 @@ const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, ga
           </Text>
         )}
 
-        <Text style={[styles.pointsLarge, { color: isWinner ? COLORS.goldLight : COLORS.textPrimary }]}>
+        <Text style={[
+          styles.pointsLarge,
+          compact && styles.pointsLargeCompact,
+          { color: isWinner ? COLORS.goldLight : COLORS.textPrimary },
+        ]}>
           {player.points}
-          <Text style={styles.pointsMax}> / {winPoints}</Text>
+          <Text style={[styles.pointsMax, compact && styles.pointsMaxCompact]}> / {winPoints}</Text>
         </Text>
 
         <PointPips
           points={player.points}
           max={winPoints}
           color={isWinner ? COLORS.goldLight : COLORS.arcaneBright}
+          compact={compact}
         />
 
-        <View style={styles.btnRow}>
+        <View style={[styles.btnRow, compact && styles.btnRowCompact]}>
           <TouchableOpacity
-            style={[styles.ptBtn, styles.ptBtnMinus]}
+            style={[styles.ptBtn, styles.ptBtnMinus, compact && styles.ptBtnCompact]}
             onPress={handleRemove}
             disabled={player.points <= 0}
           >
-            <Ionicons name="remove" size={22} color={player.points > 0 ? COLORS.textSecondary : COLORS.textMuted} />
+            <Ionicons name="remove" size={compact ? 18 : 22} color={player.points > 0 ? COLORS.textSecondary : COLORS.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.ptBtn, styles.ptBtnPlus, isWinner && styles.ptBtnWin]}
+            style={[styles.ptBtn, styles.ptBtnPlus, compact && styles.ptBtnCompact, isWinner && styles.ptBtnWin]}
             onPress={handleAdd}
             disabled={isWinner}
           >
@@ -137,7 +147,7 @@ const PlayerCard = ({ player, onAddPoint, onRemovePoint, winPoints, isWinner, ga
               colors={isWinner ? [COLORS.goldDark, COLORS.goldDark] : [COLORS.arcane, COLORS.arcaneBright]}
               style={styles.ptBtnGradient}
             >
-              <Ionicons name="add" size={26} color={COLORS.textPrimary} />
+              <Ionicons name="add" size={compact ? 22 : 26} color={COLORS.textPrimary} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -605,6 +615,7 @@ const MatchSetup = ({ onStart, username }) => {
 export default function ScoreScreen({ username }) {
   const [view, setView] = useState('setup'); // 'setup' | 'game' | 'history'
   const [matchConfig, setMatchConfig] = useState(null);
+  const { height: screenHeight } = useWindowDimensions();
 
   // Game state
   const [players, setPlayers] = useState([]);
@@ -741,6 +752,7 @@ export default function ScoreScreen({ username }) {
 
   // ── Game View ─────────────────────────────────────────────────────────────────
   const winsNeeded = matchConfig.format === 'bo3' ? 2 : 1;
+  const compact = screenHeight < 700;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top","left","right"]}>
@@ -750,13 +762,10 @@ export default function ScoreScreen({ username }) {
           <Text style={styles.headerTitle}>RIFTBOUND</Text>
           <Text style={styles.headerSub}>
             {matchConfig.format === 'bo3' ? `Game ${currentGame} of 3  ·  ` : ''}
-            Round {round} · First to {matchConfig.winPoints}
+            First to {matchConfig.winPoints}
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setRound(r => r + 1)}>
-            <Ionicons name="arrow-forward-circle-outline" size={22} color={COLORS.textSecondary} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={resetToSetup}>
             <Ionicons name="close-outline" size={22} color={COLORS.textSecondary} />
           </TouchableOpacity>
@@ -777,9 +786,12 @@ export default function ScoreScreen({ username }) {
       )}
 
       {/* Players */}
-      <ScrollView contentContainerStyle={styles.playersContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.playersContainer, compact && styles.playersContainerCompact, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {players.map(player => (
-          <View key={player.id}>
+          <View key={player.id} style={{ flex: 1 }}>
             {editingName === player.id ? (
               <View style={styles.nameEditRow}>
                 <TextInput
@@ -806,6 +818,7 @@ export default function ScoreScreen({ username }) {
               isWinner={gameWinner?.id === player.id && gameOver}
               gameWins={gameWins[player.name] || 0}
               matchFormat={matchConfig.format}
+              compact={compact}
             />
           </View>
         ))}
@@ -1033,6 +1046,7 @@ const styles = StyleSheet.create({
 
   // Players
   playersContainer: { padding: SPACING.md, gap: SPACING.md },
+  playersContainerCompact: { padding: SPACING.sm, gap: SPACING.sm },
   nameEditHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4, paddingLeft: 4 },
   nameEditHintText: { fontSize: 10, color: COLORS.textMuted },
   nameEditRow: { marginBottom: 4 },
@@ -1044,6 +1058,7 @@ const styles = StyleSheet.create({
 
   playerCard: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
   playerCardGradient: { padding: SPACING.lg },
+  playerCardGradientCompact: { padding: SPACING.md, paddingVertical: SPACING.sm },
   winnerBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start', backgroundColor: COLORS.goldDark,
@@ -1053,13 +1068,19 @@ const styles = StyleSheet.create({
   winnerText: { fontSize: 10, color: COLORS.goldLight, fontWeight: '700', letterSpacing: 2 },
   playerNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   playerName: { fontSize: 22, fontWeight: '700', color: COLORS.textPrimary },
+  playerNameCompact: { fontSize: 17 },
   playerBattlefield: { fontSize: 11, color: COLORS.textMuted, marginBottom: SPACING.xs },
   pointsLarge: { fontSize: 64, fontWeight: '800', lineHeight: 72 },
+  pointsLargeCompact: { fontSize: 42, lineHeight: 48 },
   pointsMax: { fontSize: 28, color: COLORS.textMuted, fontWeight: '400' },
+  pointsMaxCompact: { fontSize: 20 },
   pipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: SPACING.md },
+  pipsRowCompact: { gap: 4, marginVertical: SPACING.sm },
   pip: { width: 24, height: 24, borderRadius: RADIUS.full, borderWidth: 1.5 },
   btnRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
+  btnRowCompact: { marginTop: SPACING.xs },
   ptBtn: { flex: 1, height: 52, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center' },
+  ptBtnCompact: { height: 42 },
   ptBtnMinus: { backgroundColor: COLORS.bgElevated, borderWidth: 1, borderColor: COLORS.border },
   ptBtnPlus: { overflow: 'hidden' },
   ptBtnWin: { opacity: 0.5 },
