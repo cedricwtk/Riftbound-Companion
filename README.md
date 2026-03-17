@@ -4,7 +4,7 @@ A React Native (Expo) app for tracking scores and building decks for the Riftbou
 
 ## Features
 - **Score Tracker** — Track points for 2 players, configurable win condition (default 8), round tracker, game history saved locally
-- **Card Browser** — Browse all Riftbound cards via Scrydex API, filter by domain/type, view full card details
+- **Card Browser** — Browse all Riftbound cards via Riftcodex API, filter by domain/type, view full card details
 - **Deck Builder** — Create & save custom decks, view deck stats (cost curve, type/domain breakdown), share decklists
 
 ---
@@ -16,12 +16,7 @@ A React Native (Expo) app for tracking scores and building decks for the Riftbou
 npm install
 ```
 
-### 2. Set up Scrydex API Key
-1. Go to https://scrydex.com and sign up for a free account
-2. Get your API key and Team ID
-3. Open `src/utils/api.js` and replace:
-   - `YOUR_SCRYDEX_API_KEY` with your API key
-   - `YOUR_TEAM_ID` with your team ID
+### 2. Set up RiftCodex
 
 ### 3. Run the app
 ```bash
@@ -68,6 +63,6 @@ riftbound-app/
 │   │   └── AppNavigator.js       # Bottom tab navigation
 │   └── utils/
 │       ├── theme.js              # Colors, spacing, fonts
-│       ├── api.js                # Scrydex API calls
+│       ├── api.js                # Riftcodex API calls
 │       └── storage.js            # AsyncStorage helpers
 ```

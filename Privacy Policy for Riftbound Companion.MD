@@ -3,7 +3,7 @@ Privacy Policy for Riftbound Companion
 Last updated: March 8, 2026
 
 Overview
-Riftbound Companion is a companion app for Legends of Runeterra players. This policy explains what data the app collects and how it's used.
+Riftbound Companion is a companion app for Riftbound players. This policy explains what data the app collects and how it's used.
 
 Data Stored Locally on Your Device
 All user data is stored locally on your device using AsyncStorage. This includes:
